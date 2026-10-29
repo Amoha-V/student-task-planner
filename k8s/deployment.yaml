@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: student-task-planner
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: student-task-planner}
+  template:
+    metadata:
+      labels: {app: student-task-planner}
+    spec:
+      containers:
+        - name: app
+          # Replace REPLACE_ACR_NAME with your registry name (Jenkins updates the tag on each build)
+          image: REPLACE_ACR_NAME.azurecr.io/student-task-planner:latest
+          ports: [{containerPort: 8080}]
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {cpu: 500m, memory: 512Mi}
+          readinessProbe:
+            httpGet: {path: /api/health, port: 8080}
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /api/health, port: 8080}
+            initialDelaySeconds: 30
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: student-task-planner
+spec:
+  type: LoadBalancer
+  selector: {app: student-task-planner}
+  ports:
+    - port: 80
+      targetPort: 8080

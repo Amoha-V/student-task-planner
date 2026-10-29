@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Student Task Planner</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <header>
+    <h1>Student Task Planner</h1>
+    <dl class="stats">
+      <div><dt>Total</dt><dd id="s-total">0</dd></div>
+      <div><dt>Pending</dt><dd id="s-pending">0</dd></div>
+      <div><dt>Completed</dt><dd id="s-done">0</dd></div>
+    </dl>
+  </header>
+
+  <form id="form">
+    <input type="hidden" id="id">
+    <label class="wide">Title <input id="title" required maxlength="100" placeholder="e.g. Complete CI/CD Assignment"></label>
+    <label class="wide">Description <input id="description" maxlength="300"></label>
+    <label>Priority
+      <select id="priority"><option value="LOW">Low</option><option value="MEDIUM" selected>Medium</option><option value="HIGH">High</option></select>
+    </label>
+    <label>Due date <input type="date" id="dueDate"></label>
+    <div class="actions">
+      <button type="submit" id="save">Add task</button>
+      <button type="button" id="cancel" class="ghost" hidden>Cancel edit</button>
+    </div>
+    <p id="error" role="alert"></p>
+  </form>
+
+  <section class="filters">
+    <input id="q" type="search" placeholder="Search tasks" aria-label="Search tasks">
+    <select id="status" aria-label="Filter by status"><option value="all">All statuses</option><option value="pending">Pending</option><option value="completed">Completed</option></select>
+    <select id="fpriority" aria-label="Filter by priority"><option value="all">All priorities</option><option value="HIGH">High</option><option value="MEDIUM">Medium</option><option value="LOW">Low</option></select>
+  </section>
+
+  <ul id="list"></ul>
+  <p id="empty" hidden>No tasks match. Add one above to get started.</p>
+</main>
+<script src="app.js"></script>
+</body>
+</html>
