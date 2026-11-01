@@ -1,36 +1,104 @@
-// Windows Jenkins agent. Edit ACR_NAME, then create the Jenkins items listed in README.md.
+
 pipeline {
-  agent any
-  tools { jdk 'JDK17'; maven 'Maven3' }
-  environment {
-    ACR_NAME  = 'REPLACE_ACR_NAME'
-    IMAGE     = "${ACR_NAME}.azurecr.io/student-task-planner"
-    TAG       = "${env.BUILD_NUMBER}"
-  }
-  stages {
-    stage('Checkout')        { steps { checkout scm } }
-    stage('Build and test')  {
-      steps { bat 'mvn -B clean package' }
-      post { always { junit 'target/surefire-reports/*.xml' } }
+    agent any
+
+    environment {
+        GCP_PROJECT = 'axiomatic-set-443307-k3'
+        GCP_REGION = 'asia-south1'
+        AR_REPOSITORY = 'student-planner-repo'
+
+        IMAGE = 'asia-south1-docker.pkg.dev/axiomatic-set-443307-k3/student-planner-repo/student-task-planner'
+        TAG = "${env.BUILD_NUMBER}"
+
+        GKE_CLUSTER = 'REPLACE_WITH_YOUR_GKE_CLUSTER_NAME'
+        DEPLOY_TO_GKE = 'false'
+
+        MAVEN = 'C:\\Apache\\maven\\bin\\mvn.cmd'
     }
-    stage('Build image')     { steps { bat "docker build -t %IMAGE%:%TAG% -t %IMAGE%:latest ." } }
-    stage('Push to ACR')     {
-      steps {
-        withCredentials([usernamePassword(credentialsId: 'acr-credentials', usernameVariable: 'ACR_USER', passwordVariable: 'ACR_PASS')]) {
-          bat 'docker login %ACR_NAME%.azurecr.io -u %ACR_USER% -p %ACR_PASS%'
-          bat "docker push %IMAGE%:%TAG%"
-          bat "docker push %IMAGE%:latest"
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
         }
-      }
-    }
-    stage('Deploy to AKS')   {
-      steps {
-        withCredentials([file(credentialsId: 'aks-kubeconfig', variable: 'KUBECONFIG')]) {
-          bat 'kubectl apply -f k8s/deployment.yaml'
-          bat "kubectl set image deployment/student-task-planner app=%IMAGE%:%TAG%"
-          bat 'kubectl rollout status deployment/student-task-planner --timeout=180s'
+
+        stage('Build and Test') {
+            steps {
+                bat '"%MAVEN%" -B clean package'
+            }
+            post {
+                always {
+                    junit allowEmptyResults: true,
+                          testResults: 'target/surefire-reports/*.xml'
+                }
+            }
         }
-      }
+
+        stage('Build Docker Image') {
+            steps {
+                bat 'docker build -t %IMAGE%:%TAG% -t %IMAGE%:latest .'
+            }
+        }
+
+        stage('Authenticate with Google Cloud') {
+            steps {
+                withCredentials([
+                    file(credentialsId: 'gcp-service-account-json',
+                         variable: 'GCP_KEY')
+                ]) {
+                    bat '''
+                        gcloud auth activate-service-account --key-file="%GCP_KEY%"
+                        gcloud config set project %GCP_PROJECT%
+                        gcloud auth configure-docker asia-south1-docker.pkg.dev --quiet
+                    '''
+                }
+            }
+        }
+
+        stage('Push to Artifact Registry') {
+            steps {
+                bat 'docker push %IMAGE%:%TAG%'
+                bat 'docker push %IMAGE%:latest'
+            }
+        }
+
+        stage('Deploy to GKE') {
+            when {
+                expression {
+                    return env.DEPLOY_TO_GKE == 'true'
+                }
+            }
+            steps {
+                withCredentials([
+                    file(credentialsId: 'gcp-service-account-json',
+                         variable: 'GCP_KEY')
+                ]) {
+                    bat '''
+                        gcloud auth activate-service-account --key-file="%GCP_KEY%"
+                        gcloud container clusters get-credentials %GKE_CLUSTER% --region %GCP_REGION% --project %GCP_PROJECT%
+                        kubectl apply -f k8s/deployment.yaml
+                        kubectl set image deployment/student-task-planner app=%IMAGE%:%TAG%
+                        kubectl rollout status deployment/student-task-planner --timeout=180s
+                    '''
+                }
+            }
+        }
+
+        stage('Verify Docker Image') {
+            steps {
+                bat 'docker images %IMAGE%'
+            }
+        }
     }
-  }
+
+    post {
+        success {
+            echo 'Student Task Planner CI/CD Pipeline completed successfully!'
+        }
+        failure {
+            echo 'Student Task Planner CI/CD Pipeline failed.'
+        }
+    }
 }
