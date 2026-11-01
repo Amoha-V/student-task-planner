@@ -10,9 +10,9 @@ pipeline {
         IMAGE = 'asia-south1-docker.pkg.dev/axiomatic-set-443307-k3/student-planner-repo/student-task-planner'
         TAG = "${env.BUILD_NUMBER}"
 
-        GKE_CLUSTER = 'REPLACE_WITH_YOUR_GKE_CLUSTER_NAME'
-        DEPLOY_TO_GKE = 'false'
-
+        GKE_CLUSTER = 'student-planner-cluster'
+        GKE_ZONE = 'asia-south1-a'
+        DEPLOY_TO_GKE = 'true'
         MAVEN = 'C:\\Apache\\maven\\bin\\mvn.cmd'
     }
 
@@ -77,7 +77,7 @@ pipeline {
                 ]) {
                     bat '''
                         gcloud auth activate-service-account --key-file="%GCP_KEY%"
-                        gcloud container clusters get-credentials %GKE_CLUSTER% --region %GCP_REGION% --project %GCP_PROJECT%
+                        gcloud container clusters get-credentials %GKE_CLUSTER% --zone %GKE_ZONE% --project %GCP_PROJECT%
                         kubectl apply -f k8s/deployment.yaml
                         kubectl set image deployment/student-task-planner app=%IMAGE%:%TAG%
                         kubectl rollout status deployment/student-task-planner --timeout=180s
