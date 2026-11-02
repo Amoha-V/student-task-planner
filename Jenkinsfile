@@ -12,7 +12,10 @@ pipeline {
 
         GKE_CLUSTER = 'student-planner-cluster'
         GKE_ZONE = 'asia-south1-a'
-        DEPLOY_TO_GKE = 'true'
+
+        // Keep false until the GKE cluster is ready.
+        DEPLOY_TO_GKE = 'false'
+
         MAVEN = 'C:\\Apache\\maven\\bin\\mvn.cmd'
     }
 
@@ -21,6 +24,19 @@ pipeline {
         stage('Checkout') {
             steps {
                 checkout scm
+            }
+        }
+
+        stage('Checkov Security Scan') {
+            steps {
+                bat '''
+                    docker run --rm ^
+                    -v "%WORKSPACE%:/src" ^
+                    bridgecrew/checkov:latest ^
+                    --directory /src ^
+                    --framework kubernetes,dockerfile ^
+                    --soft-fail
+                '''
             }
         }
 
@@ -71,18 +87,7 @@ pipeline {
                 }
             }
             steps {
-                withCredentials([
-                    file(credentialsId: 'gcp-service-account-json',
-                         variable: 'GCP_KEY')
-                ]) {
-                    bat '''
-                        gcloud auth activate-service-account --key-file="%GCP_KEY%"
-                        gcloud container clusters get-credentials %GKE_CLUSTER% --zone %GKE_ZONE% --project %GCP_PROJECT%
-                        kubectl apply -f k8s/deployment.yaml
-                        kubectl set image deployment/student-task-planner app=%IMAGE%:%TAG%
-                        kubectl rollout status deployment/student-task-planner --timeout=180s
-                    '''
-                }
+                echo 'GKE deployment will be configured through Ansible.'
             }
         }
 
