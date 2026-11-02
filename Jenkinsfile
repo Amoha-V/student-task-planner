@@ -14,7 +14,7 @@ pipeline {
 
         // GKE configuration
         GKE_CLUSTER = 'student-planner-cluster'
-        GKE_ZONE = 'asia-south1-a'
+        GKE_ZONE = 'asia-south2-a'
         DEPLOY_TO_GKE = 'true'
 
         // Maven configuration
@@ -105,7 +105,7 @@ pipeline {
             }
         }
 
-        // 8. Deploy using Ansible
+        // 8. Deploy to GKE using Ansible
         stage('Deploy to GKE using Ansible') {
             when {
                 expression {
@@ -121,7 +121,7 @@ pipeline {
                     )
                 ]) {
                     bat '''
-                        wsl.exe -d %WSL_DISTRO% -- bash -lc "set -euo pipefail; WORKSPACE_WSL=$(wslpath -u '%WORKSPACE%'); KEY_WSL=$(wslpath -u '%GCP_KEY%'); export CLOUDSDK_CONFIG=/tmp/gcloud-jenkins-%BUILD_NUMBER%; export KUBECONFIG=$CLOUDSDK_CONFIG/kubeconfig; mkdir -p $CLOUDSDK_CONFIG; trap 'rm -rf $CLOUDSDK_CONFIG' EXIT; cd \\"$WORKSPACE_WSL\\"; gcloud auth activate-service-account --key-file=\\"$KEY_WSL\\" --project=%GCP_PROJECT%; gcloud container clusters get-credentials %GKE_CLUSTER% --zone %GKE_ZONE% --project %GCP_PROJECT%; ANSIBLE_CONFIG=ansible/ansible.cfg ansible-playbook ansible/deploy.yml -e image_tag=%IMAGE%:%TAG%"
+                        wsl.exe -d %WSL_DISTRO% -- bash -lc "set -euo pipefail; WORKSPACE_WSL=$(wslpath -u '%WORKSPACE%'); KEY_WSL=$(wslpath -u '%GCP_KEY%'); mkdir -p /tmp/gcloud-jenkins-%BUILD_NUMBER%; export CLOUDSDK_CONFIG=/tmp/gcloud-jenkins-%BUILD_NUMBER%; export KUBECONFIG=/tmp/gcloud-jenkins-%BUILD_NUMBER%/kubeconfig; trap 'rm -rf /tmp/gcloud-jenkins-%BUILD_NUMBER%' EXIT; cd \\"$WORKSPACE_WSL\\"; gcloud auth activate-service-account --key-file=\\"$KEY_WSL\\" --project=%GCP_PROJECT%; gcloud container clusters get-credentials %GKE_CLUSTER% --zone %GKE_ZONE% --project %GCP_PROJECT%; ANSIBLE_CONFIG=ansible/ansible.cfg ansible-playbook ansible/deploy.yml -e image_tag=%IMAGE%:%TAG%"
                     '''
                 }
             }
