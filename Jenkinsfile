@@ -15,7 +15,7 @@ pipeline {
         // GKE configuration
         GKE_CLUSTER = 'student-planner-cluster'
         GKE_ZONE = 'asia-south1-a'
-        DEPLOY_TO_GKE = 'false'
+        DEPLOY_TO_GKE = 'true'
 
         // Maven configuration
         MAVEN = 'C:\\Apache\\maven\\bin\\mvn.cmd'
