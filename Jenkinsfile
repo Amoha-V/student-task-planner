@@ -123,86 +123,14 @@ pipeline {
                     powershell '''
                         $ErrorActionPreference = "Stop"
 
-                        # Convert the Jenkins credential path to a WSL path.
-                        $keyPath = (
-                            wsl.exe -d Ubuntu -- wslpath -u "$env:GCP_KEY"
-                        ).Trim()
+                        # The /p flag makes WSL translate these Windows paths to /mnt/... paths.
+                        $env:WSLENV = "WORKSPACE/p:GCP_KEY/p:BUILD_NUMBER:GCP_PROJECT:GKE_CLUSTER:GKE_ZONE:IMAGE:TAG"
 
-                        if ($LASTEXITCODE -ne 0 -or !$keyPath) {
-                            throw "Could not convert the GCP credential path."
-                        }
+                        # -e runs the command directly (no shell), so arguments are not mangled.
+                        wsl.exe -d Ubuntu --cd "$env:WORKSPACE" -e bash ansible/deploy-from-jenkins.sh
 
-                        # Store the converted path in the Jenkins workspace.
-                        $pathFile = Join-Path $env:WORKSPACE "gcp-key-path.txt"
-
-                        Set-Content -Path $pathFile -Value $keyPath -NoNewline
-
-                        # Pass required Jenkins environment variables into WSL.
-                        $oldWslEnv = $env:WSLENV
-
-                        $env:WSLENV = "WORKSPACE/p:BUILD_NUMBER:GCP_PROJECT:GKE_CLUSTER:GKE_ZONE:IMAGE:TAG"
-
-                        try {
-                            wsl.exe -d Ubuntu -- bash -lc '
-                                set -euo pipefail
-
-                                echo "Starting GKE deployment..."
-
-                                # WORKSPACE is translated into a WSL path.
-                                WORKSPACE_WSL="$WORKSPACE"
-
-                                # Read the WSL-compatible service-account path.
-                                KEY_WSL=$(cat "$WORKSPACE_WSL/gcp-key-path.txt")
-
-                                if [[ ! -f "$KEY_WSL" ]]; then
-                                    echo "ERROR: GCP credential file not found."
-                                    exit 1
-                                fi
-
-                                # Isolate Google Cloud credentials for this build.
-                                export CLOUDSDK_CONFIG="/tmp/gcloud-jenkins-$BUILD_NUMBER"
-                                export KUBECONFIG="$CLOUDSDK_CONFIG/kubeconfig"
-
-                                mkdir -p "$CLOUDSDK_CONFIG"
-
-                                # Remove temporary Google Cloud configuration.
-                                cleanup() {
-                                    rm -rf "$CLOUDSDK_CONFIG"
-                                }
-
-                                trap cleanup EXIT
-
-                                cd "$WORKSPACE_WSL"
-
-                                # Authenticate using the Jenkins service account.
-                                gcloud auth activate-service-account \
-                                    --key-file="$KEY_WSL" \
-                                    --project="$GCP_PROJECT"
-
-                                # Connect to the GKE cluster.
-                                gcloud container clusters get-credentials \
-                                    "$GKE_CLUSTER" \
-                                    --zone "$GKE_ZONE" \
-                                    --project "$GCP_PROJECT"
-
-                                # Deploy the new Docker image using Ansible.
-                                ANSIBLE_CONFIG=ansible/ansible.cfg \
-                                ansible-playbook ansible/deploy.yml \
-                                    -e "image_tag=${IMAGE}:${TAG}"
-
-                                echo "GKE deployment completed successfully."
-                            '
-
-                            if ($LASTEXITCODE -ne 0) {
-                                throw "GKE deployment failed."
-                            }
-                        }
-                        finally {
-                            # Remove temporary path file.
-                            Remove-Item $pathFile -Force -ErrorAction SilentlyContinue
-
-                            # Restore previous WSL environment configuration.
-                            $env:WSLENV = $oldWslEnv
+                        if ($LASTEXITCODE -ne 0) {
+                            throw "GKE deployment failed (exit code $LASTEXITCODE)."
                         }
                     '''
                 }
