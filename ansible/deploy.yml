@@ -1,0 +1,60 @@
+---
+- name: Deploy Student Task Planner to GKE
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    deployment_name: student-task-planner
+    container_name: app
+    manifest_file: "{{ playbook_dir }}/../k8s/deployment.yaml"
+
+  tasks:
+    - name: Verify image tag is provided
+      ansible.builtin.assert:
+        that:
+          - image_tag is defined
+          - image_tag | default('') | length > 0
+        fail_msg: "A Docker image tag must be provided."
+
+    - name: Check Kubernetes cluster connection
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/kubectl
+          - cluster-info
+      changed_when: false
+
+    - name: Apply Kubernetes configuration
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/kubectl
+          - apply
+          - -f
+          - "{{ manifest_file }}"
+      register: apply_result
+      changed_when: "'created' in apply_result.stdout or 'configured' in apply_result.stdout"
+
+    - name: Update application container image
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/kubectl
+          - set
+          - image
+          - "deployment/{{ deployment_name }}"
+          - "{{ container_name }}={{ image_tag }}"
+      register: image_result
+      changed_when: "'image updated' in image_result.stdout"
+
+    - name: Wait for deployment rollout
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/kubectl
+          - rollout
+          - status
+          - "deployment/{{ deployment_name }}"
+          - --timeout=180s
+      changed_when: false
+
+    - name: Display deployment result
+      ansible.builtin.debug:
+        msg: "Student Task Planner deployment completed successfully."
