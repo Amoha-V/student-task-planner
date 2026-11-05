@@ -2,6 +2,11 @@
 pipeline {
     agent any
 
+    options {
+        timestamps()
+        disableConcurrentBuilds()
+    }
+
     environment {
         // Google Cloud configuration
         GCP_PROJECT = 'axiomatic-set-443307-k3'
@@ -70,11 +75,13 @@ pipeline {
             }
         }
 
-        // 5. Build Docker image
+        // 5. Build Docker image using the existing JAR
         stage('Build Docker Image') {
             steps {
                 bat '''
-                    docker build -t %IMAGE%:%TAG% -t %IMAGE%:latest .
+                    docker build ^
+                    -t %IMAGE%:%TAG% ^
+                    -t %IMAGE%:latest .
                 '''
             }
         }
@@ -123,11 +130,11 @@ pipeline {
                     powershell '''
                         $ErrorActionPreference = "Stop"
 
-                        # The /p flag makes WSL translate these Windows paths to /mnt/... paths.
+                        # Pass Windows paths to WSL in translated form
                         $env:WSLENV = "WORKSPACE/p:GCP_KEY/p:BUILD_NUMBER:GCP_PROJECT:GKE_CLUSTER:GKE_ZONE:IMAGE:TAG"
 
-                        # -e runs the command directly (no shell), so arguments are not mangled.
-                        wsl.exe -d Ubuntu --cd "$env:WORKSPACE" -e bash ansible/deploy-from-jenkins.sh
+                        # Execute the Ansible deployment script
+                        wsl.exe -d $env:WSL_DISTRO --cd "$env:WORKSPACE" -e bash ansible/deploy-from-jenkins.sh
 
                         if ($LASTEXITCODE -ne 0) {
                             throw "GKE deployment failed (exit code $LASTEXITCODE)."
@@ -140,7 +147,9 @@ pipeline {
         // 9. Verify Docker image
         stage('Verify Docker Image') {
             steps {
-                bat 'docker images %IMAGE%'
+                bat '''
+                    docker images %IMAGE%
+                '''
             }
         }
     }
@@ -159,3 +168,5 @@ pipeline {
         }
     }
 }
+
+// 

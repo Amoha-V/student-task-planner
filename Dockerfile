@@ -1,14 +1,18 @@
-FROM maven:3.9-eclipse-temurin-17 AS build
-WORKDIR /app
-COPY pom.xml .
-RUN mvn -q dependency:go-offline
-COPY src ./src
-RUN mvn -q clean package -DskipTests
 
+# Use a lightweight Java 17 runtime image
 FROM eclipse-temurin:17-jre
+
 WORKDIR /app
-RUN useradd -r appuser
-COPY --from=build /app/target/student-task-planner.jar app.jar
+
+# Create a non-root application user
+RUN useradd --system --no-create-home appuser
+
+# Copy the JAR already built and tested by Jenkins
+COPY --chown=appuser:appuser target/student-task-planner.jar app.jar
+
+# Run the application as a non-root user
 USER appuser
+
 EXPOSE 8080
-ENTRYPOINT ["java","-jar","app.jar"]
+
+ENTRYPOINT ["java", "-jar", "app.jar"]
