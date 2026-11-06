@@ -42,8 +42,8 @@ echo "Getting GKE cluster credentials..."
 
 gcloud container clusters get-credentials "$GKE_CLUSTER" \
     --zone="$GKE_ZONE" \
-    --project="$GCP_PROJECT"
-
+    --project="$GCP_PROJECT" \
+    --dns-endpoint
 echo "Running Ansible deployment..."
 
 ANSIBLE_CONFIG=ansible/ansible.cfg \
