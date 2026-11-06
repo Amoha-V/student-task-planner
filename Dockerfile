@@ -1,6 +1,11 @@
-
 # Use a lightweight Java 17 runtime image
 FROM eclipse-temurin:17-jre
+
+# Add image metadata
+LABEL maintainer="Amoha" \
+    application="Student Task Planner" \
+    version="1.0" \
+    description="Java 17 Spring Boot application for managing student tasks"
 
 WORKDIR /app
 
